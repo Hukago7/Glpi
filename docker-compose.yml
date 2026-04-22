@@ -1,0 +1,61 @@
+version: "3.9"
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: glpi-db
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - glpi_net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: glpi-redis
+    restart: unless-stopped
+    networks:
+      - glpi_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
+  glpi:
+    image: hukago7/glpi-docker:latest
+    container_name: glpi
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      GLPI_DB_HOST: db
+    ports:
+      - "${GLPI_PORT:-8080}:80"
+    volumes:
+      - glpi_files:/var/www/html/files
+      - glpi_config:/var/www/html/config
+    networks:
+      - glpi_net
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+networks:
+  glpi_net:
+    driver: bridge
+
+volumes:
+  db_data:
+  glpi_files:
+  glpi_config:
